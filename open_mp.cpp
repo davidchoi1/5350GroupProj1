@@ -2,6 +2,8 @@
 #include <iostream>
 #include <vector>
 
+#define DEFAULT_NUM_THREADS 9
+
 /**
  * For the sake of simplicity, we will implement the algorithms as well as the correctness tests in one
  * long spaghetti file (this current file - open_mp.cpp). Below is a rough draft of function prototypes
@@ -11,11 +13,11 @@
 // Function prototypes
 std::vector<std::vector<int>> serialMM(const std::vector<std::vector<int>> &A, const std::vector<std::vector<int>> &B);
 
-std::vector<std::vector<int>> parallelMM(const std::vector<std::vector<int>> &A, const std::vector<std::vector<int>> &B);
+std::vector<std::vector<int>> parallelMM(const std::vector<std::vector<int>> &A, const std::vector<std::vector<int>> &B, int P);
 
-std::vector<std::vector<int>> oneDMM(const std::vector<std::vector<int>> &A, const std::vector<std::vector<int>> &B);
+std::vector<std::vector<int>> oneDMM(const std::vector<std::vector<int>> &A, const std::vector<std::vector<int>> &B, int P);
 
-std::vector<std::vector<int>> twoDMM(const std::vector<std::vector<int>> &A, const std::vector<std::vector<int>> &B);
+std::vector<std::vector<int>> twoDMM(const std::vector<std::vector<int>> &A, const std::vector<std::vector<int>> &B, int P);
 
 void testMM();
 
@@ -27,7 +29,7 @@ int main()
 {
     testMM(); // Run correctness tests
 
-    // OpenMP pragma directive to create a parallel region
+    // // OpenMP pragma directive to create a parallel region
     // #pragma omp parallel
     // {
     //     // Get the unique identifier of the current thread
@@ -36,7 +38,7 @@ int main()
     //     // Print a message indicating which thread is executing
     //     std::cout << "Hello from thread " << ID << std::endl;
     // }
-    // End of the parallel region
+    // // End of the parallel region
 
     return 0;
 }
@@ -53,10 +55,10 @@ std::vector<std::vector<int>> serialMM(const std::vector<std::vector<int>> &A, c
     std::vector<std::vector<int>> C(m, std::vector<int>(q, 0));
 
     // Perform matrix multiplication
-    for (int i = 0; i < m; ++i)
-    { // m == A.size()
-        for (int j = 0; j < q; ++j)
-        { // q == B[0].size()
+    for (int i = 0; i < m; ++i)  // m == A.size()
+    {
+        for (int j = 0; j < q; ++j) // q == B[0].size()
+        { 
             for (int k = 0; k < n; ++k)
             {                                 // n == B.size()
                 C[i][j] += A[i][k] * B[k][j]; // perform the multiplication
@@ -67,11 +69,12 @@ std::vector<std::vector<int>> serialMM(const std::vector<std::vector<int>> &A, c
     return C;
 }
 
-std::vector<std::vector<int>> parallelMM(const std::vector<std::vector<int>> &A, const std::vector<std::vector<int>> &B)
+std::vector<std::vector<int>> parallelMM(const std::vector<std::vector<int>> &A, const std::vector<std::vector<int>> &B, int P)
 {
     int m = A.size();                                           // Number of rows in A
     int n = A[0].size();                                        // Number of columns in A / rows in B
     int q = B[0].size();                                        // Number of columns in B
+    omp_set_num_threads(P);
     std::vector<std::vector<int>> C(m, std::vector<int>(q, 0)); // Resultant matrix
 
     // Parallelize the outer loop
@@ -102,15 +105,17 @@ std::vector<std::vector<int>> parallelMM(const std::vector<std::vector<int>> &A,
  * 1D Matrix Multiplication
  * Row-wise parallelization : each thread is responsible for operations of a row of A and column of B
 */
-std::vector<std::vector<int>> oneDMM(const std::vector<std::vector<int>> &A, const std::vector<std::vector<int>> &B) {
+std::vector<std::vector<int>> oneDMM(const std::vector<std::vector<int>> &A, const std::vector<std::vector<int>> &B, int P) {
     int m = A.size();           // Number of rows in A
     int n = A[0].size();        // Number of columns in A (and number of rows in B)
     int q = B[0].size();        // Number of columns in B
+    omp_set_num_threads(P);
+
     std::vector<std::vector<int>> C(m, std::vector<int>(q, 0)); // Resultant matrix
     /**
      * -Range of loops divide into chunks, with each chunk assigned to different thread.
      * -Each thread executes its assigned chunk independently -> this is okay because
-     * the results of one chunk (row of A, col of B) is not dependent on other chunks
+     *  the results of one chunk (row of A, col of B) is not dependent on other chunks
      * -Parallelized over rows of resultant matrix
     */
     #pragma omp parallel for
@@ -134,11 +139,12 @@ std::vector<std::vector<int>> oneDMM(const std::vector<std::vector<int>> &A, con
  * 2D Matrix Multiplication
  * Element-wise parallelization : each thread is responsible for operations of an element of C
 */
-std::vector<std::vector<int>> twoDMM(const std::vector<std::vector<int>> &A, const std::vector<std::vector<int>> &B) {
+std::vector<std::vector<int>> twoDMM(const std::vector<std::vector<int>> &A, const std::vector<std::vector<int>> &B, int P) {
     int m = A.size();    // Number of rows in matrix A
     int n = A[0].size(); // Number of columns in matrix A / Number of rows in matrix B
     int q = B[0].size(); // Number of columns in matrix B
     std::vector<std::vector<int>> C(m, std::vector<int>(q, 0)); // Initialize the resultant matrix C with zeros
+    omp_set_num_threads(P);
 
     /**
      * Collapse row/col loops into a single loop and divide equal-sized chunks workload among threads
@@ -175,10 +181,10 @@ void testMM()
     std::vector<std::vector<int>> B = {{7, 8}, {9, 10}, {11, 12}};
 
     // Perform matrix multiplication
-    // std::vector<std::vector<int>> C = serialMM(A, B);
-    // std::vector<std::vector<int>> C = parallelMM(A, B);
-    // std::vector<std::vector<int>> C = oneDMM(A, B);
-    std::vector<std::vector<int>> C = twoDMM(A, B);
+    // std::vector<std::vector<int>> C = serialMM(A, B, DEFAULT_NUM_THREADS);
+    // std::vector<std::vector<int>> C = parallelMM(A, B, DEFAULT_NUM_THREADS);
+    // std::vector<std::vector<int>> C = oneDMM(A, B, DEFAULT_NUM_THREADS);
+    std::vector<std::vector<int>> C = twoDMM(A, B, DEFAULT_NUM_THREADS);
 
     // Display the C
     std::cout << "C matrix:" << std::endl;
