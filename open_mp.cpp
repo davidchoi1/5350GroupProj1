@@ -1,8 +1,12 @@
 #include <omp.h> // OpenMP header for parallel programming
 #include <iostream>
 #include <vector>
+#include <chrono>
+#include <cstdlib> // Random number generator
+#include <ctime> 
 
 #define DEFAULT_NUM_THREADS 9
+#define NUMBER_OF_RUNS 5
 
 /**
  * For the sake of simplicity, we will implement the algorithms as well as the correctness tests in one
@@ -19,6 +23,14 @@ std::vector<std::vector<int>> oneDMM(const std::vector<std::vector<int>> &A, con
 
 std::vector<std::vector<int>> twoDMM(const std::vector<std::vector<int>> &A, const std::vector<std::vector<int>> &B, int P);
 
+std::vector<std::vector<int>> generateSquareMatrix(int);
+std::vector<std::vector<int>> generateMatrix(int, int);
+
+double testSMM(std::vector<std::vector<int>>, std::vector<std::vector<int>>, int);
+void testPMM(std::vector<std::vector<int>>, std::vector<std::vector<int>>, int, int, double);
+void test1DMM(std::vector<std::vector<int>>, std::vector<std::vector<int>>, int, int, double);
+void test2DMM(std::vector<std::vector<int>>, std::vector<std::vector<int>>, int, int, double);
+
 void testMM();
 
 /**
@@ -27,7 +39,102 @@ void testMM();
  */
 int main()
 {
-    testMM(); // Run correctness tests
+    // Seed the random number generator
+    std::srand(std::time(nullptr));
+    double ts = 0.0;
+
+    // Square Matrix of size n x n
+    for(int p = 4; p <= 8; p += 4){
+        for(int i = 2; i <= 10; i++){
+            std::cout << i << " x " << i << " square matrix" << std::endl;
+            std::cout << "Number of processors: " << p << std::endl;
+            std::cout << std::endl;
+
+        
+            std::vector<std::vector<int>> A = generateSquareMatrix(i);
+            std::vector<std::vector<int>> B = generateSquareMatrix(i);
+
+            
+            
+            std::cout << "A matrix:" << std::endl;
+            for (const auto &row : A)
+            {
+                for (int val : row)
+                {
+                    std::cout << val << " ";
+                }
+                std::cout << std::endl;
+            }
+
+            std::cout << std::endl;
+
+            std::cout << "B matrix:" << std::endl;
+            for (const auto &row : B)
+            {
+                for (int val : row)
+                {
+                    std::cout << val << " ";
+                }
+                std::cout << std::endl;
+            }
+
+            std::cout << std::endl;
+
+            ts = testSMM(A, B, NUMBER_OF_RUNS);
+            testPMM(A, B, NUMBER_OF_RUNS, p, ts);
+            test1DMM(A, B, NUMBER_OF_RUNS, p, ts);
+            test2DMM(A, B, NUMBER_OF_RUNS, p, ts);
+        }
+    }
+    
+    // Matrices of size m x n & n x q
+    for(int p = 4; p <= 8; p += 4){
+        for(int m = 1; m <= 10; m++){
+            for(int n = 1; n <= 10; n++){
+                for(int q = 10; q >= 1; q--){
+                    std::cout << "m x n : n x q = ";
+                    std::cout << m << " x " << n << " : " <<  n << " x " << q << std::endl;
+                    std::cout << "Number of processors: " << p << std::endl;
+                    std::cout << std::endl;
+
+                    std::vector<std::vector<int>> A = generateMatrix(m, n);
+                    std::vector<std::vector<int>> B = generateMatrix(n, q);
+                    
+                    std::cout << "A matrix:" << std::endl;
+                    for (const auto &row : A)
+                    {
+                        for (int val : row)
+                        {
+                            std::cout << val << " ";
+                        }
+                        std::cout << std::endl;
+                    }
+
+                    std::cout << std::endl;
+
+                    std::cout << "B matrix:" << std::endl;
+                    for (const auto &row : B)
+                    {
+                        for (int val : row)
+                        {
+                            std::cout << val << " ";
+                        }
+                        std::cout << std::endl;
+                    }
+
+                    std::cout << std::endl;
+
+                    ts = testSMM(A, B, NUMBER_OF_RUNS);
+                    testPMM(A, B, NUMBER_OF_RUNS, p, ts);
+                    test1DMM(A, B, NUMBER_OF_RUNS, p, ts);
+                    test2DMM(A, B, NUMBER_OF_RUNS, p, ts);
+                }
+            }
+        }
+    }    
+    
+
+    //testMM(); // Run correctness tests
 
     // // OpenMP pragma directive to create a parallel region
     // #pragma omp parallel
@@ -170,11 +277,200 @@ std::vector<std::vector<int>> twoDMM(const std::vector<std::vector<int>> &A, con
     return C; // Return the resultant matrix C
 }
 
+/**
+ * Generate Square Matrix
+*/
+std::vector<std::vector<int>> generateSquareMatrix(int n) {
+    std::vector<std::vector<int>> matrix(n, std::vector<int>(n));
+
+    // Fill the matrix with random numbers between 1 and 1000
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            matrix[i][j] = std::rand() % 1000 + 1;
+        }
+    }
+
+    return matrix;
+}
+
+/**
+ * Generate Matrix m x n
+*/
+std::vector<std::vector<int>> generateMatrix(int rows, int cols) {
+    std::vector<std::vector<int>> matrix(rows, std::vector<int>(cols));
+
+    // Fill the matrix with random numbers between 1 and 1000
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            matrix[i][j] = std::rand() % 1000 + 1;
+        }
+    }
+
+    return matrix;
+}
+
+double testSMM(std::vector<std::vector<int>> A, std::vector<std::vector<int>> B, int runs){
+    double sum = 0.0;
+
+    // Measure time for serialMM
+    for(int i = 0; i < runs; i++){
+        auto start = std::chrono::high_resolution_clock::now();
+        std::vector<std::vector<int>> C = serialMM(A, B);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration_serial = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        std::cout << "Time taken by serialMM: " << duration_serial.count() << " microseconds" << std::endl;
+        sum += static_cast<double>(duration_serial.count());
+        
+        if(i == 4){
+            std::cout << std::endl;
+            // Display the C
+            std::cout << "C matrix:" << std::endl;
+            for (const auto &row : C)
+            {
+                for (int val : row)
+                {
+                    std::cout << val << " ";
+                }
+                std::cout << std::endl;
+            }
+            std::cout << std::endl;
+        }
+    }
+
+    double average = sum / runs;
+    std::cout << "Average time taken by serialMM: " << average << " microseconds" << std::endl;
+    std::cout << "=================================================" << std::endl;
+    
+    return average;
+}
+
+void testPMM(std::vector<std::vector<int>> A, std::vector<std::vector<int>> B, int runs, int processors, double serial_time){
+    double sum = 0.0;
+
+    std::cout << std::endl;
+
+    // Measure time for parallelMM
+    for(int i = 0; i < runs; i++){
+        auto start = std::chrono::high_resolution_clock::now();
+        std::vector<std::vector<int>> C = parallelMM(A, B, processors);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration_parallel = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        std::cout << "Time taken by parallelMM: " << duration_parallel.count() << " microseconds" << std::endl;
+        sum += static_cast<double>(duration_parallel.count());
+        
+        if(i == 4){
+            std::cout << std::endl;
+            // Display the C
+            std::cout << "C matrix:" << std::endl;
+            for (const auto &row : C)
+            {
+                for (int val : row)
+                {
+                    std::cout << val << " ";
+                }
+                std::cout << std::endl;
+            }
+            std::cout << std::endl;
+        }
+    }
+
+    double parallel_time = sum / runs;
+
+    std::cout << "Average time taken by parallelMM: " << parallel_time << " microseconds" << std::endl;
+    std::cout << "=================================================" << std::endl;
+
+    double speedup = serial_time / parallel_time ;
+    std::cout << "Speedup: " << speedup << std::endl;
+    std::cout << "=================================================" << std::endl;
+}
+
+void test1DMM(std::vector<std::vector<int>> A, std::vector<std::vector<int>> B, int runs, int processors, double serial_time){
+    double sum = 0.0;
+
+    std::cout << std::endl;
+
+    // Measure time for 1DMM
+    for(int i = 0; i < runs; i++){
+        auto start = std::chrono::high_resolution_clock::now();
+        std::vector<std::vector<int>> C = oneDMM(A, B, processors);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration_1DMM = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        std::cout << "Time taken by oneDMM: " << duration_1DMM.count() << " microseconds" << std::endl;
+        sum += static_cast<double>(duration_1DMM.count());
+        
+        if(i == 4){
+            std::cout << std::endl;
+            // Display the C
+            std::cout << "C matrix:" << std::endl;
+            for (const auto &row : C)
+            {
+                for (int val : row)
+                {
+                    std::cout << val << " ";
+                }
+                std::cout << std::endl;
+            }
+            std::cout << std::endl;
+        }
+    }
+
+    double parallel_time = sum / runs;
+
+    std::cout << "Average time taken by 1DMM: " << parallel_time << " microseconds" << std::endl;
+    std::cout << "=================================================" << std::endl;
+
+    double speedup = serial_time / parallel_time ;
+    std::cout << "Speedup: " << speedup << std::endl;
+    std::cout << "=================================================" << std::endl;
+}
+
+void test2DMM(std::vector<std::vector<int>> A, std::vector<std::vector<int>> B, int runs, int processors, double serial_time){
+    double sum = 0.0;
+
+    std::cout << std::endl;
+
+    // Measure time for 2DMM
+    for(int i = 0; i < runs; i++){
+        auto start = std::chrono::high_resolution_clock::now();
+        std::vector<std::vector<int>> C = twoDMM(A, B, processors);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration_2DMM = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        std::cout << "Time taken by 2DMM: " << duration_2DMM.count() << " microseconds" << std::endl;
+        sum += static_cast<double>(duration_2DMM.count());
+        
+        if(i == 4){
+            std::cout << std::endl;
+            // Display the C
+            std::cout << "C matrix:" << std::endl;
+            for (const auto &row : C)
+            {
+                for (int val : row)
+                {
+                    std::cout << val << " ";
+                }
+                std::cout << std::endl;
+            }
+            std::cout << std::endl;
+        }
+    }
+
+    double parallel_time = sum / runs;
+
+    std::cout << "Average time taken by 2DMM: " << parallel_time << " microseconds" << std::endl;
+    std::cout << "=================================================" << std::endl;
+
+    double speedup = serial_time / parallel_time ;
+    std::cout << "Speedup: " << speedup << std::endl;
+    std::cout << "=================================================" << std::endl;
+
+    std::cout << std::endl;
+    std::cout << std::endl;
+}
 
 // This is a correctness test, not a performance test
 void testMM()
 {
-    // Call MM functions with test cases
+   // Call MM functions with test cases
 
     // Calling the serialMM function to run on example matrices A and B
     std::vector<std::vector<int>> A = {{1, 2, 3}, {4, 5, 6}};
