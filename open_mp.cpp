@@ -382,6 +382,8 @@ void testPMM(std::vector<std::vector<int>> A, std::vector<std::vector<int>> B, i
     double speedup = serial_time / parallel_time ;
     std::cout << "Speedup: " << speedup << std::endl;
     std::cout << "=================================================" << std::endl;
+    std::cout << "Cost: " << processors * parallel_time << " processor-mircroseconds" << std::endl;
+    std::cout << "=================================================" << std::endl;
 }
 
 void test1DMM(std::vector<std::vector<int>> A, std::vector<std::vector<int>> B, int runs, int processors, double serial_time){
@@ -422,6 +424,8 @@ void test1DMM(std::vector<std::vector<int>> A, std::vector<std::vector<int>> B, 
     double speedup = serial_time / parallel_time ;
     std::cout << "Speedup: " << speedup << std::endl;
     std::cout << "=================================================" << std::endl;
+    std::cout << "Cost: " << processors * parallel_time << " processor-mircroseconds" << std::endl;
+    std::cout << "=================================================" << std::endl;
 }
 
 void test2DMM(std::vector<std::vector<int>> A, std::vector<std::vector<int>> B, int runs, int processors, double serial_time){
@@ -461,6 +465,8 @@ void test2DMM(std::vector<std::vector<int>> A, std::vector<std::vector<int>> B, 
 
     double speedup = serial_time / parallel_time ;
     std::cout << "Speedup: " << speedup << std::endl;
+    std::cout << "=================================================" << std::endl;
+    std::cout << "Cost: " << processors * parallel_time << " processor-mircroseconds" << std::endl;
     std::cout << "=================================================" << std::endl;
 
     std::cout << std::endl;
